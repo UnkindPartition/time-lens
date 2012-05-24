@@ -5,10 +5,10 @@ module Data.Time.Lens
     , minutes
     , seconds
       -- * Date
-    , HasDay(..)
+    , HasDate(..)
     , year
     , month
-    , dayOfMonth
+    , day
     , gregorianDay
       -- * Time zone
     , HasTimeZone(..)
@@ -63,35 +63,35 @@ instance HasTime T.ZonedTime where
 instance HasTime T.UTCTime where
     time = time . iso (T.utcToLocalTime T.utc) (T.localTimeToUTC T.utc)
 
-class HasDay a where
-    day :: Lens a T.Day
+class HasDate a where
+    date :: Lens a T.Day
 
-gregorianDay :: HasDay a => Lens a (Integer,Int,Int)
-gregorianDay = iso T.toGregorian (uncurry3 T.fromGregorian) . day
+gregorianDay :: HasDate a => Lens a (Integer,Int,Int)
+gregorianDay = iso T.toGregorian (uncurry3 T.fromGregorian) . date
 
-year :: HasDay a => Lens a Integer
+year :: HasDate a => Lens a Integer
 year = lens (\(y,_,_) -> y) (\y (_,m,d) -> (y,m,d)) . gregorianDay
 
-month :: HasDay a => Lens a Int
+month :: HasDate a => Lens a Int
 month = lens (\(_,m,_) -> m) (\m (y,_,d) -> (y,m,d)) . gregorianDay
 
-dayOfMonth :: HasDay a => Lens a Int
-dayOfMonth = lens (\(_,_,d) -> d) (\d (y,m,_) -> (y,m,d)) . gregorianDay
+day :: HasDate a => Lens a Int
+day = lens (\(_,_,d) -> d) (\d (y,m,_) -> (y,m,d)) . gregorianDay
 
 uncurry3 :: (a -> b -> c -> d) -> (a, b, c) -> d
 uncurry3 f (a, b, c) = f a b c
 
-instance HasDay T.Day where
-    day = iso id id
+instance HasDate T.Day where
+    date = iso id id
 
-instance HasDay T.LocalTime where
-    day = lens T.localDay (\d s -> s { T.localDay = d })
+instance HasDate T.LocalTime where
+    date = lens T.localDay (\d s -> s { T.localDay = d })
 
-instance HasDay T.ZonedTime where
-    day = day . localTimeOfZonedTime
+instance HasDate T.ZonedTime where
+    date = date . localTimeOfZonedTime
 
-instance HasDay T.UTCTime where
-    day = day . iso (T.utcToLocalTime T.utc) (T.localTimeToUTC T.utc)
+instance HasDate T.UTCTime where
+    date = date . iso (T.utcToLocalTime T.utc) (T.localTimeToUTC T.utc)
 
 class HasTimeZone a where
     timeZone :: Lens a T.TimeZone
@@ -116,10 +116,10 @@ normalizeTime = timeToTimeOfDay . timeOfDayToTime
 ntime :: Lens a T.TimeOfDay -> Lens a T.TimeOfDay
 ntime time = iso id (fst . normalizeTime) . time
 
-ntimeAdjustDay :: (HasDay a) => Lens a T.TimeOfDay -> Lens a T.TimeOfDay
+ntimeAdjustDay :: (HasDate a) => Lens a T.TimeOfDay -> Lens a T.TimeOfDay
 ntimeAdjustDay time = lens (getL time) $ \t ->
     case normalizeTime t of
-        (t', days) -> setL time t' . modL day (T.addDays days)
+        (t', days) -> setL time t' . modL date (T.addDays days)
 
 -- We don't use T.timeToTimeOfDay and T.timeOfDayToTime here for the following
 -- reasons:
