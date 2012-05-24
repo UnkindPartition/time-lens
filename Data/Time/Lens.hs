@@ -24,6 +24,7 @@ module Data.Time.Lens
     , Lens
     , getL
     , modL
+    , setL
     )
 where
 
