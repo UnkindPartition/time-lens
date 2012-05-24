@@ -30,7 +30,7 @@ where
 import Control.Category
 import Prelude hiding ((.), id)
 import Data.Lens.Common
-import Data.Fixed (Pico)
+import Data.Fixed
 import qualified Data.Time as T
 
 class HasTime a where
@@ -46,7 +46,7 @@ seconds :: HasTime a => Lens a Pico
 seconds = (lens T.todSec $ \x t -> t { T.todSec = x }) . time
 
 instance HasTime T.TimeOfDay where
-    time = iso id id
+    time = ntime $ iso id id
 
 localTimeOfZonedTime :: Lens T.ZonedTime T.LocalTime
 localTimeOfZonedTime =
@@ -54,7 +54,8 @@ localTimeOfZonedTime =
         \x t -> t { T.zonedTimeToLocalTime = x }
 
 instance HasTime T.LocalTime where
-    time = lens T.localTimeOfDay $ \x t -> t { T.localTimeOfDay = x }
+    time = ntimeAdjustDay $
+        lens T.localTimeOfDay $ \x t -> t { T.localTimeOfDay = x }
 
 instance HasTime T.ZonedTime where
     time = time . localTimeOfZonedTime
@@ -106,3 +107,34 @@ tzName = (lens T.timeZoneName $ \x t -> t { T.timeZoneName = x }) . timeZone
 
 instance HasTimeZone T.ZonedTime where
     timeZone = lens T.zonedTimeZone $ \x t -> t { T.zonedTimeZone = x }
+
+normalizeTime :: T.TimeOfDay -> (T.TimeOfDay, Integer)
+normalizeTime = timeToTimeOfDay . timeOfDayToTime
+
+-- Can't rely on a HasTime instance here because this function will be used to
+-- define one
+ntime :: Lens a T.TimeOfDay -> Lens a T.TimeOfDay
+ntime time = iso id (fst . normalizeTime) . time
+
+ntimeAdjustDay :: (HasDay a) => Lens a T.TimeOfDay -> Lens a T.TimeOfDay
+ntimeAdjustDay time = lens (getL time) $ \t ->
+    case normalizeTime t of
+        (t', days) -> setL time t' . modL day (T.addDays days)
+
+-- We don't use T.timeToTimeOfDay and T.timeOfDayToTime here for the following
+-- reasons:
+-- * T.timeOfDayToTime could potentially perform bounds checking (although its
+-- current implementation doesn't)
+-- * T.timeToTimeOfDay converts excess time to leap seconds
+timeOfDayToTime :: T.TimeOfDay -> T.DiffTime
+timeOfDayToTime (T.TimeOfDay h m s) = ((fromIntegral h) * 60 + (fromIntegral m)) * 60 + (realToFrac s)
+
+timeToTimeOfDay :: T.DiffTime -> (T.TimeOfDay, Integer)
+timeToTimeOfDay dt = (T.TimeOfDay (fromInteger h) (fromInteger m) s, d) where
+    s' = realToFrac dt
+    s = mod' s' 60
+    m' = div' s' 60
+    m = mod' m' 60
+    h' = div' m' 60
+    h = mod' h' 24
+    d = div' h' 24
