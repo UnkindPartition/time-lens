@@ -1,15 +1,17 @@
 module Data.Time.Lens
     ( -- * Time
+      -- $time
       HasTime(..)
     , hours
     , minutes
     , seconds
       -- * Date
+      -- $date
     , HasDate(..)
     , year
     , month
     , day
-    , gregorianDay
+    , gregorian
       -- * Time zone
     , HasTimeZone(..)
     , tzMinutes
@@ -24,6 +26,7 @@ module Data.Time.Lens
       -- * Re-exports from "Data.Lens.Common"
     , Lens
     , getL
+    , modL
     )
 where
 
@@ -32,6 +35,31 @@ import Prelude hiding ((.), id)
 import Data.Lens.Common
 import Data.Fixed
 import qualified Data.Time as T
+import Data.Time (TimeOfDay(..), LocalTime(..), fromGregorian)
+
+-- $time
+-- The semantics of 'getL' for time lenses ('time','hours','minutes','seconds')
+-- is straightforward.
+--
+-- The semantics of 'setL' is to «normalize» the time before setting. Hence
+-- @'modL' 'minutes' (+5)@ will correctly add 5 minutes to the time, e.g.
+--
+-- >>> modL minutes (+5) (TimeOfDay 16 57 13)
+-- 17:02:13
+--
+-- If this means crossing a day boundary, the semantics varies for different
+-- structures. For structures that have a date component (i.e. for instances of
+-- 'HasDate') the date is adjusted appropriately.
+--
+-- >>> modL hours (+10) (LocalTime (fromGregorian 2012 05 23) (TimeOfDay 16 57 13))
+-- 2012-05-24 02:57:13
+-- >>> modL seconds (subtract 1) (LocalTime (fromGregorian 2012 05 23) (TimeOfDay 0 0 0))
+-- 2012-05-22 23:59:59
+--
+-- If there's no date, the time is simply wrapped around.
+--
+-- >>> modL seconds (subtract 1) (TimeOfDay 0 0 0)
+-- 23:59:59
 
 class HasTime a where
     time :: Lens a T.TimeOfDay
@@ -63,12 +91,24 @@ instance HasTime T.ZonedTime where
 instance HasTime T.UTCTime where
     time = time . iso (T.utcToLocalTime T.utc) (T.localTimeToUTC T.utc)
 
+-- $date
+-- In contrast to 'time', the 'date' lens is a simple accessor (it doesn't make
+-- sense to «normalize» a 'T.Day').
+--
+-- Instead, setters for 'year', 'month' and 'day' have special semantics
+-- described below.
+-- Getters are always straightforward.
+
 class HasDate a where
     date :: Lens a T.Day
 
-gregorianDay :: HasDate a => Lens a (Integer,Int,Int)
-gregorianDay = iso T.toGregorian (uncurry3 T.fromGregorian) . date
+-- | The semantics of 'gregorian' corresponds to that of 'T.toGregorian' and
+-- 'T.fromGregorian'
+gregorian :: HasDate a => Lens a (Integer,Int,Int)
+gregorian = iso T.toGregorian (uncurry3 T.fromGregorian) . date
 
+-- | @'modL' 'year' (+n)@ adds @n@ years, matching month and day, with Feb 29th
+-- rolled over to Mar 1st if necessary (like 'T.addGregorianYearsRollOver')
 year :: HasDate a => Lens a Integer
 year = lens getYear setYear . date
     where
@@ -79,6 +119,8 @@ year = lens getYear setYear . date
         case T.toGregorian date of
             (origYear,_,_) -> T.addGregorianYearsRollOver (fromIntegral $ year - origYear) date
 
+-- | @'modL' 'month' (+n)@ adds @n@ months, with days past the last day of the
+-- month rolling over to the next month (like 'T.addGregorianMonthsRollOver')
 month :: HasDate a => Lens a Int
 month = lens getMonth setMonth . date
     where
@@ -89,6 +131,8 @@ month = lens getMonth setMonth . date
         case T.toGregorian date of
             (_,origMonth,_) -> T.addGregorianMonthsRollOver (fromIntegral $ month - origMonth) date
 
+-- | @'modL' 'day' (+n)@ computes the date @n@ days after the original date
+-- (like 'T.addDays')
 day :: HasDate a => Lens a Int
 day = lens getDay setDay . date
     where
