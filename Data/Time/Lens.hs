@@ -14,9 +14,6 @@ module Data.Time.Lens
     , gregorian
       -- * Time zone
     , HasTimeZone(..)
-    , tzMinutes
-    , tzSummerOnly
-    , tzName
       -- * Re-exports from "Data.Time"
     , T.Day
     , T.TimeOfDay
@@ -158,20 +155,23 @@ instance HasDate T.ZonedTime where
 instance HasDate T.UTCTime where
     date = date . iso (T.utcToLocalTime T.utc) (T.localTimeToUTC T.utc)
 
-class HasTimeZone a where
+-- $zone
+-- Getting 'timeZone' is straightforward. Setting 'TimeZone' changes both
+-- 'timeZone' and 'time' (and 'date', if present) in such a way that the new
+-- zoned time corresponds to the same UTC time as the original zoned time.
+
+class HasTime a => HasTimeZone a where
     timeZone :: Lens a T.TimeZone
 
-tzMinutes :: HasTimeZone a => Lens a Int
-tzMinutes = (lens T.timeZoneMinutes $ \x t -> t { T.timeZoneMinutes = x }) . timeZone
-
-tzSummerOnly :: HasTimeZone a => Lens a Bool
-tzSummerOnly = (lens T.timeZoneSummerOnly $ \x t -> t { T.timeZoneSummerOnly = x }) . timeZone
-
-tzName :: HasTimeZone a => Lens a String
-tzName = (lens T.timeZoneName $ \x t -> t { T.timeZoneName = x }) . timeZone
-
 instance HasTimeZone T.ZonedTime where
-    timeZone = lens T.zonedTimeZone $ \x t -> t { T.zonedTimeZone = x }
+    timeZone = lens T.zonedTimeZone setTimeZone
+        where
+        setTimeZone z t = t { T.zonedTimeZone = z, T.zonedTimeToLocalTime = newTime }
+            where newTime = modL minutes (+ T.timeZoneMinutes z) $ T.zonedTimeToLocalTime t
+
+--
+-- Auxiliary functions
+--
 
 normalizeTime :: T.TimeOfDay -> (T.TimeOfDay, Integer)
 normalizeTime = timeToTimeOfDay . timeOfDayToTime
