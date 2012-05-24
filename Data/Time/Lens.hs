@@ -70,13 +70,34 @@ gregorianDay :: HasDate a => Lens a (Integer,Int,Int)
 gregorianDay = iso T.toGregorian (uncurry3 T.fromGregorian) . date
 
 year :: HasDate a => Lens a Integer
-year = lens (\(y,_,_) -> y) (\y (_,m,d) -> (y,m,d)) . gregorianDay
+year = lens getYear setYear . date
+    where
+    getYear date =
+        case T.toGregorian date of
+            (year,_,_) -> year
+    setYear year date =
+        case T.toGregorian date of
+            (origYear,_,_) -> T.addGregorianYearsRollOver (fromIntegral $ year - origYear) date
 
 month :: HasDate a => Lens a Int
-month = lens (\(_,m,_) -> m) (\m (y,_,d) -> (y,m,d)) . gregorianDay
+month = lens getMonth setMonth . date
+    where
+    getMonth date =
+        case T.toGregorian date of
+            (_,month,_) -> month
+    setMonth month date =
+        case T.toGregorian date of
+            (_,origMonth,_) -> T.addGregorianMonthsRollOver (fromIntegral $ month - origMonth) date
 
 day :: HasDate a => Lens a Int
-day = lens (\(_,_,d) -> d) (\d (y,m,_) -> (y,m,d)) . gregorianDay
+day = lens getDay setDay . date
+    where
+    getDay date =
+        case T.toGregorian date of
+            (_,_,day) -> day
+    setDay day date =
+        case T.toGregorian date of
+            (_,_,origDay) -> T.addDays (fromIntegral $ day - origDay) date
 
 uncurry3 :: (a -> b -> c -> d) -> (a, b, c) -> d
 uncurry3 f (a, b, c) = f a b c
