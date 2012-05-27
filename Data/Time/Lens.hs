@@ -168,8 +168,10 @@ class HasTime a => HasTimeZone a where
 instance HasTimeZone T.ZonedTime where
     timeZone = lens T.zonedTimeZone setTimeZone
         where
-        setTimeZone z t = t { T.zonedTimeZone = z, T.zonedTimeToLocalTime = newTime }
-            where newTime = modL minutes (+ T.timeZoneMinutes z) $ T.zonedTimeToLocalTime t
+        setTimeZone newz (T.ZonedTime oldt oldz) = T.ZonedTime newt newz
+            where
+                newt = modL minutes (+ tdiff) oldt
+                tdiff = T.timeZoneMinutes newz - T.timeZoneMinutes oldz
 
 --
 -- Auxiliary functions
