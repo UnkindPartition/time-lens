@@ -13,6 +13,7 @@ module Data.Time.Lens
     , day
     , gregorian
       -- * Time zone
+      -- $zone
     , HasTimeZone(..)
       -- * Re-exports from "Data.Time"
     , T.Day
