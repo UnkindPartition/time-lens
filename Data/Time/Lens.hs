@@ -21,7 +21,7 @@ module Data.Time.Lens
     , T.LocalTime
     , T.ZonedTime
     , T.getZonedTime
-      -- * Re-exports from "Data.Lens.Common"
+      -- * Re-exports from "Data.Lens.Light"
     , Lens
     , getL
     , modL
