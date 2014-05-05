@@ -31,7 +31,7 @@ where
 
 import Control.Category
 import Prelude hiding ((.), id)
-import Data.Lens.Common
+import Data.Lens.Light
 import Data.Fixed
 import qualified Data.Time as T
 import Data.Time (TimeOfDay(..), LocalTime(..), fromGregorian)
